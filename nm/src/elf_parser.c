@@ -8,6 +8,7 @@
 #include "../include/elf_parser.h"
 #include "../include/error_handler.h"
 
+//tests
 static void display_trucked_error(const char *filename)
 {
     fprintf(stderr, "bfd plugin: %s: file too short\n", filename);

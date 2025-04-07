@@ -1,79 +1,62 @@
 ##
 ## EPITECH PROJECT, 2023
-## Makefile
+## NM OBJDUMP
 ## File description:
 ## Makefile
 ##
 
-SRC 	= 	src/main.c			\
-		src/error_handling_file.c	\
-		src/parsing_maze.c		\
-		src/free.c			\
-		src/handle_db_array.c		\
-		src/start_end.c			\
-		src/rooms.c			\
-		src/check_room_already_exist.c	\
-		src/print_comments.c		\
-		src/solve_maze.c		\
-		src/eval_rooms.c		\
-		src/find_paths.c		\
-		src/move_robots.c		\
-		src/buffer.c			\
+CC = gcc
+CFLAGS = -Wall -Wextra -Werror -I./include
+RM = rm -f
 
-LIB 	= 	lib/my/functions_mini_printf.c	\
-		lib/my/my_str_to_word_array.c	\
-		lib/my/my_strcat.c		\
-		lib/my/my_strcmp.c		\
-		lib/my/my_strncmp.c		\
-		lib/my/my_strdup.c		\
-		lib/my/mini_printf.c		\
-		lib/my/my_str_isnum.c		\
-		lib/my/char_to_int.c		\
+NM_SRC_DIR = nm/src
+NM_INCLUDE_DIR = nm/include
+NM_SRC = $(NM_SRC_DIR)/main.c \
+         $(NM_SRC_DIR)/elf_parser.c \
+         $(NM_SRC_DIR)/error_handler.c \
+         $(NM_SRC_DIR)/utils.c \
+         $(NM_SRC_DIR)/symbol/symbol_table.c \
+         $(NM_SRC_DIR)/symbol/symbol_type.c \
+         $(NM_SRC_DIR)/symbol/symbol_utils.c \
+         $(NM_SRC_DIR)/symbol/symbol_display.c \
+         $(NM_SRC_DIR)/symbol/symbol_processing.c
 
-TESTS	=	src/error_handling_file.c	\
-		src/parsing_maze.c		\
-		src/free.c			\
-		src/handle_db_array.c		\
-		src/start_end.c			\
-		src/rooms.c			\
-		src/check_room_already_exist.c	\
-		src/print_comments.c		\
-		src/solve_maze.c		\
-		src/eval_rooms.c		\
-		src/find_paths.c		\
-		src/move_robots.c		\
-		src/buffer.c			\
+NM_OBJ = $(NM_SRC:.c=.o)
+NM_NAME = my_nm
 
-OBJ 	= 	$(SRC:.c=.o)
+OBJDUMP_SRC_DIR = objdump/src
+OBJDUMP_INCLUDE_DIR = objdump/include
+OBJDUMP_SRC = $(OBJDUMP_SRC_DIR)/main.c \
+              $(OBJDUMP_SRC_DIR)/elf_parser.c \
+              $(OBJDUMP_SRC_DIR)/error_handler.c \
+              $(OBJDUMP_SRC_DIR)/file_header.c \
+              $(OBJDUMP_SRC_DIR)/utils.c \
+              $(OBJDUMP_SRC_DIR)/get_machines.c \
+              $(OBJDUMP_SRC_DIR)/section_display.c \
 
-NAME	= 	amazed
+OBJDUMP_OBJ = $(OBJDUMP_SRC:.c=.o)
+OBJDUMP_NAME = my_objdump
 
-CFLAGS	=      -Wall -Wextra -Werror -g3
-CFLAGS	+=     -Wno-unused-parameter -Wno-unused-variable -Wno-unused-function
-FAST	=      -fno-builtin -Ofast -flto -march=native
+all: nm objdump
 
-all:		fast
+nm: $(NM_NAME)
 
-libmy.a:
-		make -C lib/my
+objdump: $(OBJDUMP_NAME)
 
-tests_run:	libmy.a
-		gcc -o unit_tests $(TESTS) tests/tests_amazed.c \
-		--coverage -lcriterion -L lib/my/ -lmy
-		./unit_tests
+$(NM_NAME): $(NM_OBJ)
+	$(CC) -o $(NM_NAME) $(NM_OBJ)
 
-$(NAME):	$(OBJ) $(LIB) libmy.a
-		gcc $(CFLAGS) -o $(NAME) $(OBJ) -L lib/my/ -lmy
-
-fast:		$(SRC)
-		gcc $(CFLAGS) -o $(NAME) $(LIB) $(SRC) $(FAST)
+$(OBJDUMP_NAME): $(OBJDUMP_OBJ)
+	$(CC) -o $(OBJDUMP_NAME) $(OBJDUMP_OBJ)
 
 clean:
-		make clean -C lib/my
-		rm -f $(OBJ) *.gcda *.gcno
+	$(RM) $(NM_OBJ)
+	$(RM) $(OBJDUMP_OBJ)
 
-fclean:		clean
-		make fclean -C lib/my
-		rm -f $(NAME) unit_tests
+fclean: clean
+	$(RM) $(NM_NAME)
+	$(RM) $(OBJDUMP_NAME)
 
-re:		fclean all
+re: fclean all
+
+.PHONY: all nm objdump clean fclean re

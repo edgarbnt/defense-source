@@ -59,4 +59,7 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all nm objdump clean fclean re
+tests_run:
+	@echo "test rule"
+
+.PHONY: all nm objdump clean fclean re tests_run

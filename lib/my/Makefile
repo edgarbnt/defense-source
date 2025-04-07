@@ -5,15 +5,15 @@
 ## Makefile
 ##
 
-SRC = 	functions_mini_printf.c	\
-		my_str_to_word_array.c	\
-		my_strcat.c	\
+SRC = 	my_strcat.c	\
 		my_strcmp.c	\
 		my_strncmp.c	\
 		my_strdup.c	\
-		mini_printf.c	\
-		my_str_isnum.c	\
-		char_to_int.c
+		char_to_int.c \
+		# my_str_isnum.c	\
+		# my_str_to_word_array.c	\
+		# functions_mini_printf.c	\
+		# mini_printf.c	\
 
 OBJ	=	$(SRC:.c=.o)
 

@@ -22,7 +22,6 @@ static int check_truncated_file(elfFile_t *elf_file, const char *filename)
     Elf64_Ehdr *header = get_elf_header(elf_file);
     Elf64_Shdr *sections = get_section_headers(elf_file);
     size_t section_end;
-
     if (elf_file->size < sizeof(Elf64_Ehdr)) {
         display_trucked_error(filename);
         return 0;

@@ -1,153 +1,183 @@
-name: chocolatine
+name: Petit pain
 
 on:
-  push:
-    branches-ignore:
-      - 'ga-ignore-*'
-  pull_request:
-    branches-ignore:
-      - 'ga-ignore-*'
+    push:
+      branches-ignore: "ga-ignore-*"
+    pull_request:
+      branches-ignore: "ga-ignore-*"
 
 env:
-  MIRROR_URL: "git@github.com:edgarbnt/defense-mirror.git"
-  EXECUTABLES: "my_nm"
-  LIBRARIES: ""
+    MIRROR_URL: "git@github.com:EpitechPGEPromo2029/B-DOP-200-LIL-2-1-chocolatine-theophile.riffe.git"
+    MIRROR_NAME: "EpitechPGEPromo2029/B-DOP-200-LIL-2-1-chocolatine-theophile.riffe"
+    EXECUTABLES: "template"
+    LIBRARIES: "lib/libmy.a"
+
 
 jobs:
-  check_repository_cleanliness:
-    name: Check repository cleanliness
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - name: Check for unwanted files
-        run: |
-          UNWANTED_FILES=$(find . -type f \( -name "*.o" -o -name "*.a" -o -name "*.gc*" -o -name "*.so" -o -name "*~" -o -name "#*#" \))
-          if [ ! -z "$UNWANTED_FILES" ]; then
-            echo "::error::Unwanted files detected:"
-            echo "$UNWANTED_FILES"
-            exit 84
-          fi
-          echo "Repository is clean"
-      - name: Check executables
-        run: |
-          EXECUTABLES=$(find . -type f -perm -u+x -not -path "./.git/*")
-          if [ -n "$EXECUTABLES" ]; then
-            echo "Found executables:"
-            echo "$EXECUTABLES"
-            for executable in $EXECUTABLES; do
-              if [ -x "$executable" ]; then
-                echo "Checking $executable"
-                if ! [ -f "$executable" ]; then
-                  echo "::error::$executable is not a regular file"
-                  exit 84
+    check_repo_mirror:
+        name: Check if in mirror
+        runs-on: ubuntu-latest
+        outputs:
+          is_mirror: ${{ steps.set_output.outputs.is_mirror }}
+
+        steps:
+          - name: Set is_mirror output
+            id: set_output
+            run: echo "is_mirror=${{ github.repository != env.MIRROR_NAME }}" >> $GITHUB_OUTPUT
+
+
+    check_coding_style:
+        name: Checking coding style
+        needs: [check_repo_mirror]
+        if: needs.check_repo_mirror.outputs.is_mirror == 'true'
+        runs-on: ubuntu-latest
+        container: ghcr.io/epitech/coding-style-checker:latest
+        outputs:
+            run_rest_jobs: ${{steps.set_output.outputs.run_jobs}}
+        
+        steps:
+          - name: Check out repository
+            uses: actions/checkout@v4
+            with:
+              ref: ${{github.head_ref}}
+              fetch-depth: 1
+            
+          - name: run coding style
+            run: $(check.sh $(pwd) $(pwd))
+
+          - name: check coding style error
+            id: set_output
+            run: |
+              if [ -s $(pwd)/coding-style-reports.log ]; then
+                echo "run_jobs=false" >> $GITHUB_OUTPUT
+                while IFS=':' read -r FILE LINE GRAVITY ERROR; do
+                  echo "::error $GRAVITY coding style error: $FILE#$LINE::$ERROR"
+                done < $(pwd)/coding-style-reports.log
+              else
+                echo "run_jobs=true" >> $GITHUB_OUTPUT
+              fi
+    
+    check_program_compilation:
+        name: Checking compilation
+        needs: [check_coding_style]
+        if: needs.check_coding_style.outputs.run_rest_jobs == 'true'
+        runs-on: ubuntu-latest
+        container: epitechcontent/epitest-docker:latest
+        outputs:
+          run_rest_jobs: ${{steps.set_output.outputs.run_jobs}}
+  
+        steps:
+          - name: Check out repository
+            uses: actions/checkout@v4
+            with:
+              fetch-depth: 1
+  
+          - name: run make re
+            timeout-minutes: 2
+            run: make re
+  
+          - name: run make clean
+            run: make clean
+  
+          - name: Check if files exist
+            id: set_output
+            run: |
+              if [ ${{env.EXECUTABLES}} ] && [ ${{env.LIBRARIES}} ]; then
+                echo "run_jobs=true" >> $GITHUB_OUTPUT
+              else
+                echo "run_jobs=false" >> $GITHUB_OUTPUT
+                echo "::error:: compilation failed"
+              fi
+    
+    run_tests:
+        name: Runs unit tests
+        needs: [check_program_compilation]
+        if: needs.check_program_compilation.outputs.run_rest_jobs == 'true'
+        runs-on: ubuntu-latest
+        container: epitechcontent/epitest-docker:latest
+
+        steps:
+          - name: Check out repository
+            uses: actions/checkout@v4
+            with:
+              fetch-depth: 1
+
+          - name: run tests
+            timeout-minutes: 2
+            run: make re tests_run
+    
+    check_banned_functions:
+        name: Checking banned functions
+        needs: [check_program_compilation]
+        if: needs.check_program_compilation.outputs.run_rest_jobs == 'true'
+        runs-on: ubuntu-latest
+        outputs:
+          run_rest_jobs: ${{steps.set_output.outputs.run_jobs}}
+
+        steps:
+          - name: Check out repository
+            uses: actions/checkout@v4
+            with:
+              fetch-depth: 1
+
+          - name: Run banned functions script
+            run: |
+              binary_path="./template"
+              authorized="read|write|malloc|free|getline"
+              reserved_keywords="if|for|while|switch|return|else|sizeof|void|va_*"
+              is_function_authorized() {
+                local func=$1
+                
+                if echo "$func" | grep -qE "$authorized"; then
+                  return 0  # Authorized function
+                else
+                  return 1  # Banned function
                 fi
-              fi
-            done
-          else
-            echo "No executables found"
-          fi
-      
+              }
 
-  check_coding_style:
-    name: Check coding style
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/epitech/coding-style-checker:latest
-    needs: check_repository_cleanliness
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - name: Check coding style
-        run: |
-          check.sh $(pwd) $(pwd)
-          if [ -s coding-style-reports.log ]; then
-            while IFS= read -r line; do
-              file_path=$(echo "$line" | cut -d: -f1)
-              line_number=$(echo "$line" | cut -d: -f2)
-              error_type=$(echo "$line" | cut -d: -f3)
-              error_msg=$(echo "$line" | cut -d: -f4-)
-              echo "::error file=${file_path},line=${line_number}::MAJOR coding style error: ${file_path}:${line_number}"
-            done < coding-style-reports.log
-            cat coding-style-reports.log
-            exit 84
-          fi
+              is_standard_lib_function() {
+                local func=$1
 
-  check_program_compilation:
-    name: Check program compilation
-    runs-on: ubuntu-latest
-    container:
-      image: epitechcontent/epitest-docker
-    needs: check_coding_style
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - name: Compile program
-        timeout-minutes: 2
-        run: |
-          make
-      - name: Clean compilation
-        run: |
-          make clean
-      - name: Check executables
-        run: |
-            for executable in $EXECUTABLES; do
-              if [ ! -f "$executable" ]; then
-                echo "::error::Executable '$executable' not found"
-                exit 84
-              fi
-              if [ ! -x "$executable" ]; then
-                echo "::error::File '$executable' exists but is not executable"
-                exit 84
-              fi
-              echo "Executable '$executable' found and is executable"
-            done
-
-  run_tests:
-    name: Run tests
-    runs-on: ubuntu-latest
-    container:
-      image: epitechcontent/epitest-docker
-    needs: check_program_compilation
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - name: Run tests
-        timeout-minutes: 2
-        run: |
-          make tests_run
-
-  push_to_mirror:
-    name: Push to mirror
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    needs: run_tests
-    steps:
-      - uses: actions/checkout@v4.2.2
-        with:
-          fetch-depth: 0
-      - name: Push to mirror
-        uses: pixta-dev/repository-mirroring-action@v1.1.1
-        with:
-          target_repo_url: ${{ env.MIRROR_URL }}
-          ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
-
-  check_libraries:
-    name: Check libraries
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Check libraries
-        run: |
-          LIBRARIES=$(find . -type f -name "*.a" -o -name "*.so" -not -path "./.git/*")
-          if [ -n "$LIBRARIES" ]; then
-            echo "Found libraries:"
-            echo "$LIBRARIES"
-            for library in $LIBRARIES; do
-              if [ -f "$library" ]; then
-                echo "Checking $library"
-                if ! [ -f "$library" ]; then
-                  echo "::error::$library is not a regular file"
-                  exit 84
+                if man 2 "$func" 2>/dev/null | grep -q "$func" || man 3 "$func" 2>/dev/null | grep -q "$func"; then
+                  return 0  # Found
+                else
+                  return 1  # Not found
                 fi
+              }
+              objdump -d "$binary_path" | grep -oP '\b\w+\b(?=\@plt)' | grep -Ev "$reserved_keywords" | sort -u | while read func; do
+                if is_standard_lib_function "$func" && ! is_function_authorized "$func"; then
+                  echo $func >> banned_funcs.log
+                fi
+              done
+
+          - name: Check for banned functions
+            id: set_output
+            run: |
+              if [ -s $(pwd)/banned_funcs.log ]; then
+                echo "run_jobs=false" >> $GITHUB_OUTPUT
+                while IFS= read -r line; do
+                  echo "::error::$line"
+                done < banned_funcs.log
+              else
+                echo "run_jobs=true" >> $GITHUB_OUTPUT
               fi
-            done
-          else
-            echo "No libraries found"
-          fi
+
+
+    push_to_mirror:
+      needs: [check_banned_functions]
+      if: needs.check_banned_functions.outputs.run_rest_jobs == 'true' && github.event_name == 'push'
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Check out repository
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+
+        - name: Mirror
+          uses: pixta-dev/repository-mirroring-action@v1
+          with:
+            target_repo_url:
+              ${{env.MIRROR_URL}}
+            ssh_private_key:
+              ${{secrets.SSH_PRIVATE}}

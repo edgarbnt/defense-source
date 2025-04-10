@@ -77,7 +77,7 @@ jobs:
   repo-mirroring:
     name: "Mirror Repository"
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.repository != env.MIRROR_URL
+    if: github.event_name == 'push'
     needs: tests-unit
     steps:
       - name: Repository mirroring to Epitech

@@ -5,7 +5,6 @@ on:
     pull_request:
       branches-ignore:
         - ga-ignore-*
-
   env:
     MIRROR_REPO:
     MIRROR_URL:

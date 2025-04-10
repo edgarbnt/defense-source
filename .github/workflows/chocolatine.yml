@@ -1,21 +1,18 @@
-name: CHOCOLATINE - Epitech Project Workflow
+name: Chocolatine
 
+env:
+  MIRROR_URL: ${{secrets.MIRROR_URL}}
+  EXECUTABLES: ${{secrets.EXECUTABLES}}
 on:
   push:
     branches-ignore:
-      - 'ga-ignore**'
+      - 'ga-ignore-**'
   pull_request:
     branches-ignore:
-      - 'ga-ignore**'
-
-env:
-  MIRROR_URL: ${{ secrets.MIRROR_URL }}
-  EXECUTABLES: ${{ secrets.EXECUTABLES }}
+      - 'ga-ignore-**'
 
 jobs:
   check_coding_style:
-    name: Check Coding Style
-    if: github.repository != env.MIRROR_URL
     runs-on: ubuntu-latest
     container: ghcr.io/epitech/coding-style-checker:latest
     steps:
@@ -23,78 +20,81 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Run coding style checker
         run: |
           check.sh $(pwd) $(pwd)
-          if [ -f coding-style-reports.log ]; then
-            while read -r line; do
-              file=$(echo "$line" | cut -d':' -f1)
-              line_num=$(echo "$line" | cut -d':' -f2)
-              message=$(echo "$line" | cut -d':' -f3-)
-              echo "::error file=$file,line=$line_num::$message"
+        
+      - name: Display coding style errors
+        if: always()
+        run: |
+          if [ -s coding-style-reports.log ]; then
+            while IFS= read -r line; do
+              file=$(echo "$line" | cut -d: -f1)
+              line_no=$(echo "$line" | cut -d: -f2)
+              error=$(echo "$line" | cut -d: -f3-)
+              echo "::error file=$file,line=$line_no::$error"
             done < coding-style-reports.log
             exit 1
           fi
 
   check_program_compilation:
-    name: Check Program Compilation
+    runs-on: ubuntu-latest
+    container: epitechcontent/epitest-docker
     needs: check_coding_style
-    if: github.repository != env.MIRROR_URL
-    runs-on: ubuntu-latest
-    container: epitechcontent/epitest-docker
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Compile project
-        run: make
-        timeout-minutes: 2
-      
-      - name: Check executables
-        run: |
-          IFS=',' read -ra EXEC_ARRAY <<< "$EXECUTABLES"
-          for exec in "${EXEC_ARRAY[@]}"; do
-            if [ ! -f "$exec" ]; then
-              echo "::error file=$exec::Executable not found"
-              exit 1
-            fi
-            if [ ! -x "$exec" ]; then
-              echo "::error file=$exec::File is not executable"
-              exit 1
-            fi
-          done
-      
-      - name: Clean project
-        run: make clean
-
-  run_tests:
-    name: Run Tests
-    needs: check_program_compilation
-    if: github.repository != env.MIRROR_URL
-    runs-on: ubuntu-latest
-    container: epitechcontent/epitest-docker
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Run tests
-        run: make tests_run
-        timeout-minutes: 2
-
-  push_to_mirror:
-    name: Push to Mirror Repository
-    needs: run_tests
-    if: github.event_name == 'push' && github.repository != env.MIRROR_URL
-    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Mirror repository
+
+      - name: Compile the project
+        run: make
+        timeout-minutes: 2
+
+      - name: Clean the project
+        run: make clean
+
+      - name: Verify executables
+        run: |
+          IFS=',' read -r EXEC_ARRAY << "$EXECUTABLES"
+          for executable in "${EXEC_ARRAY[@]}"; do
+            if [ ! -f "$executable" ]; then
+              echo "::error file=$executable::Executable '$executable' not found"
+              exit 1
+            elif [ ! -x "$executable" ]; then
+              echo "::error file=$executable::File '$executable' is not executable"
+              exit 1
+            fi
+          done
+
+  run_tests:
+    runs-on: ubuntu-latest
+    container: epitechcontent/epitest-docker
+    needs: check_program_compilation
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run tests
+        run: make tests_run
+        timeout-minutes: 2
+
+  push_to_mirror:
+    runs-on: ubuntu-latest
+    needs: run_tests
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to mirror
         uses: pixta-dev/repository-mirroring-action@v1
         with:
-          target-repo-url: ${{ env.MIRROR_URL }}
-          ssh-private-key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
+          target_repo_url:
+            ${{env.MIRROR_URL}}
+          ssh_private_key:
+            ${{secrets.SECRET_KEY}}
